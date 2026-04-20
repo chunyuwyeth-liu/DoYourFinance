@@ -1,0 +1,100 @@
+Context:
+
+Envelope Budget Management is a personal finance tool that helps people take control of their money in a simple, intuitive way.
+
+The product is built around the envelope budgeting concept: every spending category has its own “envelope” with a set budget for a month. on first day of each month, envelope re-fill automatically with set budget. When users import their bank and credit card statements, the application assigns each transaction to the appropriate envelope and tracks how much of the budget has been used for that month and track leftover budget, which will be savings.
+
+Beyond budgeting, the application gives users a clear, high-level view of their finances—how much they earn, how much they spend, and exactly where their money goes, and how much they have saved. The goal is to replace financial stress and guesswork with clarity, confidence, and control.
+
+Component:
+1. Create Spending Categories
+The Spending Categories are the equivalent of the envelopes, these are the accounts that represent expenses.  These will have titles like “vacation”,“childcare”,“date night”, “mortgage”, etc., for each expense that needs to be defined and funds allocated to.  The list of categories/envelopes will be manually added by the user, allowing the user to add as many categories/envelopes as they need.  The user may need to add or remove categories at any time, so the list will not be static, and it will support modifications to the list.
+Each spending category has the following data fields in database: 
+Unique ID - Unique ID for the Envelope in the database
+Envelope Name
+Date Added - date/time the Envelope was added to the system
+Date Deleted - defaults to null
+Format of the field is date/time
+Amount to Fund - defaults to 0.00
+Balance - defaults to 0.00 
+Maximum Balance - defaults to 0.00 
+
+2. Allocate Funds
+Each Envelope will have 3 cash values associated with it; “Amount to Fund”, “Balance” and “Maximum Balance”.  These three values are used differently to manage the amount of money in the Envelope.
+
+“Amount to Fund” will be a static number representing how much money to add to the Envelope on first of every month.  The user will set this value and will typically leave it alone.  However, expense needs can change as part of life, so the system does need to support modifying this value.
+
+The “Balance” value will change as funds are added or expenses are applied to the Envelope.  Most often the Balance value will be changed through the Fill Your Envelopes action but the user will also need the ability to manually adjust the balance of any Envelope.
+
+“Maximum Balance” will be a static number representing the maximum amount of funds that should be in the Envelope.  Over time an Envelope may not be used and the funds from that Envelope could be moved elsewhere.  The user will typically set this once and leave it alone, but like the other two values will need to support being modified.
+
+3. Fill the Envelopes & Spend and Track
+These two steps will be combined together in our Envelope Budget Management Tool, as the tool processes through statements from banks and credit cards.  Any Payments that are found in the statements will be added to an Envelope titled “To Be Distributed”, and Charges that are found will be applied to the individual Envelopes that the charge belongs to.  Before adding any payments or charges to Envelopes the user will need to map the Envelope that the payment or charge will be applied to.  The system will keep track of the Envelope a payment or charge was applied to, so that when processing future statements it can make a suggestion of which Envelope the user may want it to apply to, helping to reduce the overall effort the user needs to take when processing statements.
+
+3.1 Uploading a Statement
+The user will upload statements from their bank or credit card accounts that need to be processed and distributed to Envelopes.  The system will need to keep track of the statements that have been uploaded and whether they have been processed or not.
+Acceptance Criteria for Uploading a Statement
+Another section will be added to the system called “Statement Management”
+Within “Statement Management”, the user will have a button they can select to “Upload New Statement”
+When the user selects “Upload New Statement” they will be asked to select a file from their local device to upload.
+When the user selects the file from their local device to upload they will have 2 buttons to either “Cancel Upload Statement” or “Upload New Statement”
+When the user selects “Cancel Upload Statement” they will go back to the “Statement Management” page
+When the user selects “Upload New Statement” the statement will be added to the Statement database with the following information:
+Unique ID - Unique ID for the Statement in the database
+Statement Name - uses the name of the file
+Date Added - date/time the Statement was added to the system
+Date Processed - defaults to null (see Breaking a Statement down into Transactions section below for more information)
+Format of the field is date/time
+All Transactions Generated - Boolean, defaults to False or No (see Breaking a Statement down into Transactions section below for more information)
+Date Deleted - defaults to null
+Format of the field is date/time
+On each Statement that has not been processed (Date Processed = null) the user will have a button they can select to “Delete Statement”
+When the user selects “Delete Statement” they will be provided with 2 buttons to either “Cancel Delete Statement” or “Delete Statement"
+When the user selects “Cancel Delete Statement” they will go back to the “Statement Management” page
+When the user selects “Delete Statement”:
+The Date Deleted attribute will be populated in the Statement Database
+The Statement will no longer be visible on the “Statement Management” page
+Users are able to add an unlimited number of Statements to their account
+Very important, system need to prevent user from uploading duplicate statement.
+Statements list should be organized by month.
+
+3.2Breaking a Statement Down into Transactions 
+In order to update the Envelopes with the information in the Statement, the Statement needs to be broken down into Transactions.  Each Transaction in the Statement can then be mapped to an Envelope that it will be applied to.
+Acceptance Criteria for Breaking a Statement Down into Transactions
+On each Statement that has not been processed (Date Processed = null) AND all the transactions on that Statement have not been generated (All Transactions Generated = False), the user will have a button they can select to “Process Statement”
+When the user selects “Process Statement” the system will analyze the statement and identify all transactions that are on the statement
+For each Transaction on the Statement the system will add a record to the Transactions Database with the following information:
+Unique ID - Unique ID of the transaction in the Transactions Database
+Statement Unique ID - The Unique ID of this specific Statement from the Statements Database
+Date Added - date/time the Transaction was added to the Transactions Database
+Transaction Date - The date/time of the transaction from the Statement
+Name - The name or description of the transaction from the Statement
+Amount - The amount of the transaction from the Statement
+The format is US Dollars using the ISO 4217 format 
+Applied to Envelope - this is a Boolean attribute, defaults to False or No
+Envelope Applied to - defaults to null (see Mapping the Transactions to Envelopes section below for more information)
+Date Applied - defaults to null
+Format of the field is date/time
+When all transactions from the statement have been added to the Transaction Database, the All Transactions Generated attribute will be set to True for the Statement in the Statements Database.
+When the All Transactions Generated attribute = True, the user will have a button they can select to “Map Transactions”
+
+3.3Mapping the Transactions to Envelopes
+
+When the user selects “Map Transactions” from a Statement, they will be taken to another section called “Transaction Mapping”
+The Transaction Mapping page will display a list of all transactions that have not been applied to Envelopes (Applied to Envelope = False) with the following information:
+Name - Name field from Transactions Database
+Amount - Amount field from Transactions Database
+Envelope to Apply to - Envelope Applied to field from Transactions Database
+This will default to “Select Envelope”
+Statement Name - Statement Name from Statements Database that this Transaction is applied to
+Can be found by matching the Statement Unique ID field found in the Transactions Database and the Unique ID from the Statements Database
+On each Transaction, the Envelope to Apply to field will have a button that the user can select that will open a drop down.
+When a user selects the drop down button on Envelope to Apply to, a list of all active Envelopes (Date Deleted field in Envelopes Database = null) will be displayed
+The user will be able to select an Envelope from the drop down
+When the user selects an Envelope from the drop down list the Unique ID for that Envelope will be stored in the Envelope Applied to field in the Transactions Database
+The user will be able to modify the Envelope to Apply to mapping by selecting the drop down again and selecting a different Envelope
+This will update the Applied to field in the Transactions Database with the Unique ID of the Envelope that was just mapped
+
+4. Total Balance
+The total balance of all envelopes needs to be calculated and displayed on the top of the Envelopes page to validate all transactions have been properly accounted for.  
+

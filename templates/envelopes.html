@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Workspace Tabs -->
+<section class="panel" style="padding: 0;">
+  <div class="workspace-tabs">
+    {% for workspace in workspaces %}
+    <a href="/envelopes?workspace_id={{ workspace.id }}" 
+       class="workspace-tab {% if current_workspace_id == workspace.id %}active{% endif %}">
+      {{ workspace.name }}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <div class="total-balance-label">Total Balance</div>
+      <div class="total-balance">${{ "%.2f" | format(total_balance) }}</div>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="add-category-btn">Add New Category</button>
+      <form action="/envelopes/fill" method="post" style="display: inline;">
+        <input type="hidden" name="workspace_id" value="{{ current_workspace_id }}" />
+        <button type="submit" class="primary">Fill Envelopes</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Spending Categories</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" data-sort="name">
+          Name
+          <span class="sort-indicator"></span>
+        </th>
+        <th class="sortable" data-sort="amount_to_fund">
+          Amount to Fund
+          <span class="sort-indicator"></span>
+        </th>
+        <th class="sortable" data-sort="balance">
+          Balance
+          <span class="sort-indicator"></span>
+        </th>
+        <th class="sortable" data-sort="max_balance">
+          Max Balance
+          <span class="sort-indicator"></span>
+        </th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for envelope in envelopes %}
+      {% set is_system = envelope.name == "To Be Distributed" %}
+      <tr data-name="{{ envelope.name }}" data-amount-to-fund="{{ envelope.amount_to_fund }}" data-balance="{{ envelope.balance }}" data-max-balance="{{ envelope.max_balance }}">
+        <form action="/envelopes/update/{{ envelope.id }}" method="post" id="form-update-{{ envelope.id }}" style="display: contents;">
+          <input type="hidden" name="workspace_id" value="{{ current_workspace_id }}" />
+          {% if is_system %}
+          <input type="hidden" name="name" value="{{ envelope.name }}" />
+          {% endif %}
+          <td>
+            <input type="text" name="name" value="{{ envelope.name }}" required {% if is_system %}disabled{% endif %} />
+          </td>
+          <td>
+            <input type="number" step="0.01" name="amount_to_fund" value="{{ envelope.amount_to_fund }}" {% if is_system %}disabled{% endif %} />
+          </td>
+          <td>
+            <input type="number" step="0.01" name="balance" value="{{ envelope.balance }}" />
+          </td>
+          <td>
+            <input type="number" step="0.01" name="max_balance" value="{{ envelope.max_balance }}" {% if is_system %}disabled{% endif %} />
+          </td>
+          <td class="actions">
+            <div class="table-actions">
+              <button type="submit" class="action-link">
+                <span class="action-icon">✓</span>
+                <span>Save</span>
+              </button>
+              {% if not is_system %}
+              <button type="button" class="action-link action-link-danger" onclick="document.getElementById('delete-form-{{ envelope.id }}').submit();">
+                <span class="action-icon">🗑</span>
+                <span>Delete</span>
+              </button>
+              {% else %}
+              <span class="status-badge success">System</span>
+              {% endif %}
+            </div>
+          </td>
+        </form>
+        {% if not is_system %}
+        <form id="delete-form-{{ envelope.id }}" action="/envelopes/delete/{{ envelope.id }}" method="post" style="display: none;">
+          <input type="hidden" name="workspace_id" value="{{ current_workspace_id }}" />
+        </form>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<!-- Add Category Modal -->
+<div class="modal" id="add-category-modal" aria-hidden="true">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Create Spending Category</h3>
+      <button class="modal-close" type="button" id="close-modal" aria-label="Close">×</button>
+    </div>
+    <form action="/envelopes/create" method="post" id="create-category-form">
+      <input type="hidden" name="workspace_id" value="{{ current_workspace_id }}" />
+      <div class="form-group">
+        <label for="modal-name">Category Name</label>
+        <input type="text" id="modal-name" name="name" placeholder="e.g., Groceries, Rent" required />
+      </div>
+      <div class="form-group">
+        <label for="modal-amount_to_fund">Amount to Fund</label>
+        <input type="number" id="modal-amount_to_fund" step="0.01" name="amount_to_fund" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label for="modal-balance">Initial Balance</label>
+        <input type="number" id="modal-balance" step="0.01" name="balance" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label for="modal-max_balance">Max Balance</label>
+        <input type="number" id="modal-max_balance" step="0.01" name="max_balance" placeholder="0.00" />
+      </div>
+      <div class="actions" style="margin-top: 24px; justify-content: flex-end;">
+        <button type="button" class="button" id="cancel-btn">Cancel</button>
+        <button type="submit" class="primary">Add Category</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById("add-category-modal");
+  const addBtn = document.getElementById("add-category-btn");
+  const closeBtn = document.getElementById("close-modal");
+  const cancelBtn = document.getElementById("cancel-btn");
+  const form = document.getElementById("create-category-form");
+
+  function openModal() {
+    modal.classList.add("open");
+    document.body.style.overflow = "hidden";
+    // Focus first input
+    document.getElementById("modal-name").focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+    document.body.style.overflow = "";
+    // Reset form
+    form.reset();
+  }
+
+  addBtn?.addEventListener("click", openModal);
+  closeBtn?.addEventListener("click", closeModal);
+  cancelBtn?.addEventListener("click", closeModal);
+
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal.classList.contains("open")) {
+      closeModal();
+    }
+  });
+
+  // Table sorting functionality
+  const table = document.querySelector('table');
+  const tbody = table?.querySelector('tbody');
+  const sortableHeaders = document.querySelectorAll('.sortable');
+  let currentSort = { column: null, direction: 'asc' };
+
+  sortableHeaders.forEach(header => {
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => {
+      const column = header.dataset.sort;
+      const indicator = header.querySelector('.sort-indicator');
+      
+      // Reset all indicators
+      document.querySelectorAll('.sort-indicator').forEach(ind => {
+        ind.textContent = '';
+        ind.className = 'sort-indicator';
+      });
+
+      // Determine sort direction
+      if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort.column = column;
+        currentSort.direction = 'asc';
+      }
+
+      // Update indicator
+      indicator.textContent = currentSort.direction === 'asc' ? ' ▲' : ' ▼';
+      indicator.classList.add('active');
+
+      // Sort rows - separate "To Be Distributed" row
+      const allRows = Array.from(tbody.querySelectorAll('tr'));
+      const systemRow = allRows.find(row => row.dataset.name === 'To Be Distributed');
+      const regularRows = allRows.filter(row => row.dataset.name !== 'To Be Distributed');
+      
+      // Sort regular rows
+      regularRows.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(column) {
+          case 'name':
+            aVal = a.dataset.name?.toLowerCase() || '';
+            bVal = b.dataset.name?.toLowerCase() || '';
+            break;
+          case 'amount_to_fund':
+            aVal = parseFloat(a.dataset.amountToFund || 0);
+            bVal = parseFloat(b.dataset.amountToFund || 0);
+            break;
+          case 'balance':
+            aVal = parseFloat(a.dataset.balance || 0);
+            bVal = parseFloat(b.dataset.balance || 0);
+            break;
+          case 'max_balance':
+            aVal = parseFloat(a.dataset.maxBalance || 0);
+            bVal = parseFloat(b.dataset.maxBalance || 0);
+            break;
+          default:
+            return 0;
+        }
+
+        if (typeof aVal === 'string') {
+          return currentSort.direction === 'asc' 
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        } else {
+          return currentSort.direction === 'asc' 
+            ? aVal - bVal
+            : bVal - aVal;
+        }
+      });
+
+      // Re-append rows: system row first, then sorted regular rows
+      if (systemRow) {
+        tbody.appendChild(systemRow);
+      }
+      regularRows.forEach(row => tbody.appendChild(row));
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Transactions</h2>
+      <p class="hint">{{ statement.name }}</p>
+    </div>
+    <div class="actions">
+      <a class="button primary" href="/statements/{{ statement.id }}/map">Map Transactions</a>
+      <a class="button" href="/statements">← Back</a>
+    </div>
+  </div>
+</section>
+
+{% if not transactions %}
+<section class="panel">
+  <p class="hint" style="text-align: center; padding: 40px 0;">No transactions have been generated yet for this statement.</p>
+</section>
+{% endif %}
+
+{% for group in grouped %}
+<section class="panel">
+  <div class="account-header">
+    <div>
+      <strong>{{ group.account_name }}</strong>
+      {% if group.account_last4 != "Unknown" %}
+        <span style="color: var(--color-text-tertiary); font-size: 13px; margin-left: 8px;">****{{ group.account_last4 }}</span>
+      {% endif %}
+    </div>
+    <span class="badge">{{ group.entries|length }} transactions</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Merchant</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Category</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tx in group.entries %}
+      <tr>
+        <td>{{ tx.transaction_date }}</td>
+        <td><strong>{{ tx.name }}</strong></td>
+        <td>
+          {% set amount = tx.amount %}
+          {% if amount < 0 %}
+          <span style="color: var(--color-danger); font-weight: 600;">-${{ "%.2f" | format(-amount) }}</span>
+          {% else %}
+          <span style="color: var(--color-success); font-weight: 600;">+${{ "%.2f" | format(amount) }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if tx.applied %}
+          <span class="status-badge success">Mapped</span>
+          {% else %}
+          <span class="status-badge pending">Unassigned</span>
+          {% endif %}
+        </td>
+        <td>{{ tx.envelope_name or "-" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endfor %}
+{% endblock %}

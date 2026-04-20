@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>Upload Statement</h2>
+  <form action="/statements/upload" method="post" enctype="multipart/form-data" class="upload-form">
+    <div class="file-upload-wrapper">
+      <input type="file" name="file" accept=".csv,.pdf" required />
+      <button type="submit" class="primary">Upload Statement</button>
+    </div>
+  </form>
+  <p class="hint">Supported formats: CSV (date, name, amount) or PDF bank statements</p>
+</section>
+
+<section class="panel">
+  <h2>Statement Management</h2>
+  {% if statements %}
+  <table>
+    <thead>
+      <tr>
+        <th>Statement Name</th>
+        <th>Date Added</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for statement in statements %}
+      <tr>
+        <td><strong>{{ statement.name }}</strong></td>
+        <td>{{ statement.date_added[:10] }}</td>
+        <td>
+          {% if statement.all_transactions_generated %}
+          <span class="status-badge success">Processed</span>
+          {% else %}
+          <span class="status-badge pending">Pending</span>
+          {% endif %}
+        </td>
+        <td class="actions">
+          <a class="button" href="/statements/{{ statement.id }}/transactions">View</a>
+          <form action="/statements/process/{{ statement.id }}" method="post" style="display: inline;">
+            <button type="submit">
+              {% if statement.all_transactions_generated %}
+                Reprocess
+              {% else %}
+                Process
+              {% endif %}
+            </button>
+          </form>
+          {% if statement.all_transactions_generated %}
+          <a class="button primary" href="/statements/{{ statement.id }}/map">Map</a>
+          {% endif %}
+          <form action="/statements/delete/{{ statement.id }}" method="post" style="display: inline;">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="hint">No statements uploaded yet. Upload your first statement above.</p>
+  {% endif %}
+</section>
+{% endblock %}

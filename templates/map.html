@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Transaction Mapping</h2>
+      <p class="hint">Drag transactions onto an envelope to assign them to a spending category.</p>
+    </div>
+    <a class="button" href="/statements">← Back</a>
+  </div>
+</section>
+
+<section class="mapping-layout" data-statement-id="{{ statement.id }}">
+  <div class="panel mapping-left">
+    <div class="workspace-tabs" style="margin-bottom: 16px;">
+      {% for workspace in workspaces %}
+      <a href="/statements/{{ statement.id }}/map?workspace_id={{ workspace.id }}" 
+         class="workspace-tab {% if current_workspace_id == workspace.id %}active{% endif %}">
+        {{ workspace.name }}
+      </a>
+      {% endfor %}
+    </div>
+    <h3>Spending Categories</h3>
+    <div class="envelope-list">
+      {% for env in envelopes %}
+      <div class="envelope-card" data-envelope-id="{{ env.id }}">
+        <div class="envelope-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <strong>{{ env.name }}</strong>
+            <span class="badge">{{ mapped_counts.get(env.id, 0) }}</span>
+          </div>
+          {% if mapped_counts.get(env.id, 0) > 0 %}
+          <button class="link-button view-details" type="button" data-envelope-id="{{ env.id }}">
+            View Details
+          </button>
+          {% endif %}
+        </div>
+        <div class="drop-zone" data-envelope-id="{{ env.id }}">
+          <span>Drop transactions here</span>
+        </div>
+        <div class="envelope-transactions">
+          {% for tx in mapped_by_envelope.get(env.id, []) %}
+          <div class="transaction-card" draggable="true" data-transaction-id="{{ tx.id }}">
+            <div class="transaction-title">{{ tx.transaction_date }} · {{ tx.name }}</div>
+            <div class="transaction-meta">
+              ${{ "%.2f" | format(tx.amount) }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel mapping-right">
+    <h3>Unassigned Transactions</h3>
+    <div class="transaction-list">
+      {% if unassigned_groups %}
+        {% for group in unassigned_groups %}
+        <div class="account-group">
+          <div class="account-header">
+            <strong>{{ group.account_name }}</strong>
+            {% if group.account_last4 != "Unknown" %}
+              <span style="color: var(--color-text-tertiary); font-size: 13px;">****{{ group.account_last4 }}</span>
+            {% endif %}
+          </div>
+          <div class="account-transactions">
+            {% for tx in group.entries %}
+            <div class="transaction-card" draggable="true" data-transaction-id="{{ tx.id }}">
+              <div class="transaction-title">{{ tx.transaction_date }} · {{ tx.name }}</div>
+              <div class="transaction-meta">
+                ${{ "%.2f" | format(tx.amount) }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+          <p class="hint" style="text-align: center; padding: 40px 0;">All transactions have been assigned to categories.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<div class="modal" id="details-modal" aria-hidden="true">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="details-title">Transaction Details</h3>
+      <button class="modal-close" type="button" id="details-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body" id="details-body"></div>
+  </div>
+</div>
+
+<script>
+  const statementId = document.querySelector(".mapping-layout")?.dataset.statementId;
+  const workspaceId = {{ current_workspace_id }};
+  const dropZones = document.querySelectorAll(".drop-zone");
+  const transactions = document.querySelectorAll(".transaction-card");
+  const modal = document.getElementById("details-modal");
+  const detailsTitle = document.getElementById("details-title");
+  const detailsBody = document.getElementById("details-body");
+  const detailsClose = document.getElementById("details-close");
+  const mappedData = {{ mapped_by_envelope_json|tojson }};
+
+  function openModal(envelopeId, envelopeName) {
+    detailsTitle.textContent = `${envelopeName} — Transactions`;
+    const items = mappedData[envelopeId] || [];
+    if (!items.length) {
+      detailsBody.innerHTML = "<p class='hint' style='text-align: center; padding: 20px;'>No transactions mapped to this category.</p>";
+    } else {
+      detailsBody.innerHTML = items.map((tx) => {
+        const amount = Number(tx.amount);
+        const isNegative = amount < 0;
+        return `<div class="transaction-row">
+          <div>
+            <div style="font-weight: 500; margin-bottom: 4px;">${tx.name}</div>
+            <div style="font-size: 13px; color: var(--color-text-tertiary);">${tx.transaction_date}</div>
+          </div>
+          <div style="font-weight: 600; color: ${isNegative ? 'var(--color-danger)' : 'var(--color-success)'};">
+            ${isNegative ? '-' : '+'}$${Math.abs(amount).toFixed(2)}
+          </div>
+        </div>`;
+      }).join("");
+    }
+    modal.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  detailsClose?.addEventListener("click", closeModal);
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal.classList.contains("open")) {
+      closeModal();
+    }
+  });
+
+  document.querySelectorAll(".view-details").forEach((button) => {
+    button.addEventListener("click", () => {
+      const envelopeId = button.dataset.envelopeId;
+      const envelopeName = button.closest(".envelope-card").querySelector("strong").textContent;
+      openModal(envelopeId, envelopeName);
+    });
+  });
+
+  transactions.forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", card.dataset.transactionId);
+      event.dataTransfer.effectAllowed = "move";
+      card.style.opacity = "0.5";
+    });
+
+    card.addEventListener("dragend", () => {
+      card.style.opacity = "1";
+    });
+  });
+
+  dropZones.forEach((zone) => {
+    zone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      zone.classList.add("active");
+    });
+
+    zone.addEventListener("dragleave", () => {
+      zone.classList.remove("active");
+    });
+
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      zone.classList.remove("active");
+      const transactionId = event.dataTransfer.getData("text/plain");
+      const envelopeId = zone.dataset.envelopeId;
+      if (!transactionId || !envelopeId) return;
+
+      const formData = new FormData();
+      formData.append("envelope_id", envelopeId);
+      formData.append("workspace_id", workspaceId.toString());
+      formData.append("statement_id", statementId || "");
+
+      fetch(`/transactions/${transactionId}/assign`, {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => {
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            alert("Failed to assign transaction. Please try again.");
+          }
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          alert("An error occurred. Please try again.");
+        });
+    });
+  });
+</script>
+{% endblock %}
